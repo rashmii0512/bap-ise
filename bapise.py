@@ -3,6 +3,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.express as px
 import pandas as pd
+from guide_recommendation import recommend_guides
 
 # Load the Excel data into the 'electives' DataFrame
 electives = pd.read_excel("new_oe_pe.xlsx")
@@ -26,7 +27,7 @@ parent_technology2 = {
 
 # Map the subjects to parent technologies for 'electives'
 electives['Parent2'] = electives['Subject'].map(parent_technology2)
-electives['Parent2'].fillna('all', inplace=True)
+electives['Parent2'] = electives['Parent2'].fillna('all')
 
 # Sample data for charts (already defined in your existing code)
 data = {
@@ -68,16 +69,18 @@ df_details['Domain'] = df_details['Domain'].str.lower()
 
 # Create the Dash app
 app = dash.Dash(__name__)
-
+app.config.suppress_callback_exceptions = True
 # Define the layout of the app
 app.layout = html.Div([
     dcc.Tabs(id='tabs', value='tab-1', children=[
         dcc.Tab(label='Charts', value='tab-1'),
         dcc.Tab(label='Electives', value='tab-3'),  # Added a new tab for Electives
-        dcc.Tab(label='Project Details', value='tab-2')
+        dcc.Tab(label='OE/PE Recommendations', value='tab-2'),
+        dcc.Tab(label='Guide Recommendation', value='tab-4')
     ]),
     html.Div(id='tabs-content')
 ])
+
 
 # Define callback to update the tab content
 @app.callback(Output('tabs-content', 'children'),
@@ -99,10 +102,12 @@ def render_content(tab):
                 figure=px.treemap(df, path=['Parent Technology', 'Domain'], values='num_projects',
                                   title='Hierarchical Distribution of Projects by Domain')
             )
-        ])
+        ],
+            id='tab-1-content'
+        )
     elif tab == 'tab-2':
         return html.Div([
-            html.Label('Select a domain:', style={'margin-bottom': '10px'}),
+            html.Label('Select a domain:', style={'marginBottom': '10px'}),
             dcc.Dropdown(
                 id='domain-dropdown',
                 options=[
@@ -120,13 +125,16 @@ def render_content(tab):
                     {'label': 'DEV', 'value': 'dev'}
                 ],
                 value='aiml',
-                style={'width': '300px', 'margin-bottom': '20px'}
+                style={'width': '300px', 'marginBottom': '20px'}
             ),
-            html.Div(id='output-table', style={'background-color': 'white', 'padding': '10px', 'border': '1px solid #ddd'})
-        ])
+            html.Div(id='output-table',
+                     style={'backgroundColor': 'white', 'padding': '10px', 'border': '1px solid #ddd'})
+        ],
+            id='tab-2-content'
+        )
     elif tab == 'tab-3':  # Added tab for Electives
         return html.Div([
-            html.H1("Electives Visualization"),
+            html.H1("OE/PE Recommendations"),
             dcc.Graph(
                 id='electives-bar',
                 figure=px.bar(electives, x='Subject', y='students', title='Number of Students Enrolled in Each Subject')
@@ -141,8 +149,27 @@ def render_content(tab):
                 figure=px.sunburst(electives, path=['gParent', 'Subject'], values='students',
                                    title='Hierarchical Structure of Subjects')
             )
-            
-        ])
+
+        ],
+            id='tab-3-content'
+        )
+    elif tab == 'tab-4':
+        return html.Div([
+            html.H1("Guide Recommendation"),
+            html.Label('Enter Project Title:',
+                       style={'marginBottom': '10px', 'fontSize': '20px', 'fontWeight': 'semibold'}),
+            dcc.Input(id='project-title', type='text',
+                      style={'width': '300px', 'margin': '40px', 'padding': '10px', 'border': '1px solid #ddd',
+                             'borderRadius': '5px'}),
+            html.Button('Submit', id='submit-title', n_clicks=0,
+                        style={'padding': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px',
+                               'backgroundColor': '#007bff', 'color': 'white'}),
+            html.Div(id='output-guide', style={'background-color': 'white', 'padding': '10px', })
+        ],
+            id='tab-4-content',
+            style={'padding': '30px'}
+        )
+
 
 # Define callback to update the table based on the selected domain (already defined in your existing code)
 @app.callback(
@@ -151,35 +178,8 @@ def render_content(tab):
 )
 def update_table(selected_domain):
     filtered_data = df_details[df_details['Domain'].str.contains(selected_domain)]
-
-    def format_recommended_subjects(subjects):
-        """Formats the 'Recommended Subjects' column into a human-readable string.
-
-        Args:
-            subjects (list): List of recommended subjects (e.g., ['PE: Business Analytics with Python']).
-
-        Returns:
-            str: Formatted string of recommended subjects (separated by commas and semicolons).
-        """
-
-        if not subjects:
-            return "-"  # Handle empty lists
-
-        formatted_subjects = [subject.strip() for subject in subjects]
-        oe_subjects = [subject for subject in formatted_subjects if subject.startswith('OE:')]
-        pe_subjects = [subject for subject in formatted_subjects if subject.startswith('PE:')]
-
-        oe_string = ', '.join(oe_subjects) if oe_subjects else ''
-        pe_string = ', '.join(pe_subjects) if pe_subjects else ''
-
-        return f"{oe_string}; {pe_string}"  # Combine OE and PE subjects with semicolons
-
-    # Apply the formatting function to the 'Recommended Subjects' column
-    filtered_data['Recommended Subjects'] = filtered_data['Recommended Subjects'][0]
-
     table = html.Table(
-        # ... rest of your table code (unchanged)
-        children=[
+        [
             html.Thead(
                 [
                     html.Tr(
@@ -195,16 +195,56 @@ def update_table(selected_domain):
                 [
                     html.Tr(
                         [
-                            html.Td(filtered_data['Domain'].iloc[i], style={'border': '1px solid #ddd', 'padding': '8px'}),
-                            html.Td(filtered_data['Project Title'].iloc[i], style={'border': '1px solid #ddd', 'padding': '8px'}),
-                            html.Td(filtered_data['Recommended Subjects'].iloc[i], style={'border': '1px solid #ddd', 'padding': '8px'})
+                            html.Td(filtered_data['Domain'].iloc[i],
+                                    style={'border': '1px solid #ddd', 'padding': '8px'}),
+                            html.Td(filtered_data['Project Title'].iloc[i],
+                                    style={'border': '1px solid #ddd', 'padding': '8px'}),
+                            html.Td(filtered_data['Recommended Subjects'].iloc[i],
+                                    style={'border': '1px solid #ddd', 'padding': '8px'})
                         ]
                     ) for i in range(len(filtered_data))
                 ]
             )
-        ]
+        ],
+        style={'border-collapse': 'collapse', 'width': '100%'}
     )
     return table
+
+
+# Define callback to update the guide recommendation based on the project title
+@app.callback(
+    Output('output-guide', 'children'),
+    [Input('submit-title', 'n_clicks')],
+    [dash.dependencies.State('project-title', 'value')]
+)
+def update_guide(n_clicks, project_title):
+    if n_clicks > 0:
+        recommended_guides = recommend_guides(project_title)
+        print('-------------------------------------------------------------------------------')
+        print(recommended_guides)
+        # Display the recommended/ guides table with similarity scores
+        return html.Div([
+            html.P(f"Project Title: {project_title}", style={'fontSize': '20px', 'fontWeight': 'semibold'}),
+            html.H3("Guides Recommended for Project:", style={'marginBottom': '10px'}),
+            html.Table([
+                html.Thead([
+                    html.Tr([html.Th("Guide"), html.Th("Similarity Score")],
+                            style={'border': '1px solid #ddd', 'padding': '8px'})
+                ]),
+                html.Tbody([
+                    html.Tr([html.Td(recommended_guides['Guide'].iloc[i], style={
+                        'border': '1px solid #ddd', 'paddingLeft': '30px',
+                    }), html.Td(recommended_guides['Similarity Score'].iloc[i], style={
+                        'border': '1px solid #ddd', 'paddingLeft': '30px',
+                    }), ], style={'border': '1px solid #ddd', 'padding': '8px'}) for i in range(len(recommended_guides))
+                ])
+            ],
+                style={'borderCollapse': 'collapse', 'width': '100%', 'border': '1px solid #ddd', 'padding': '8px'}
+            )
+
+        ])
+
+
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
