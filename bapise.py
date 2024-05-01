@@ -4,8 +4,31 @@ from dash.dependencies import Input, Output
 import plotly.express as px
 import pandas as pd
 
+# Load the Excel data into the 'electives' DataFrame
+electives = pd.read_excel("new_oe_pe.xlsx")
 
-# Sample data for charts
+# Define parent-child relationships for 'electives'
+parent_technology2 = {
+    'Business Analytics with Python': 'Data Science/Analytics',
+    'Block chain Technology and Applications': 'Blockchain',
+    'Big Data Analytics': 'Data Science/Analytics',
+    'Ethical Hacking': 'Cybersecurity',
+    'Machine Learning': 'ML',
+    'Natural Language Processing': 'NLP',
+    'Cloud Computing': 'Cloud Computing',
+    'Consumer electronics': 'DEV',
+    'Cyber Security & Digital Forensics': 'Cybersecurity',
+    'Data Analytics': 'Data Science/Analytics',
+    'Human Machine Interaction': 'UX',
+    'Software testing': 'DEV',
+    'UED': 'UX',
+}
+
+# Map the subjects to parent technologies for 'electives'
+electives['Parent2'] = electives['Subject'].map(parent_technology2)
+electives['Parent2'].fillna('all', inplace=True)
+
+# Sample data for charts (already defined in your existing code)
 data = {
     'Domain': ['AIML', 'NLP', 'Computer vision', 'Deep Learning', 'Data Science/Analytics', 'Cloud Computing',
                'Generative AI', 'Image and video processing', 'Blockchain', 'Cybersecurity', 'UX', 'DEV'],
@@ -14,10 +37,10 @@ data = {
 
 df = pd.DataFrame(data)
 
-# Calculate total projects
+# Calculate total projects (already defined in your existing code)
 df['num_projects'] = df['total row']
 
-# Define a dictionary mapping each domain to its parent technology
+# Define a dictionary mapping each domain to its parent technology (already defined in your existing code)
 parent_technology = {
     'AIML': 'AI/ML',
     'NLP': 'AI/ML',
@@ -35,12 +58,12 @@ parent_technology = {
 
 df['Parent Technology'] = df['Domain'].map(parent_technology)
 
-# Sample data for project details
+# Sample data for project details (already defined in your existing code)
 project_data = pd.read_excel("./output.xlsx")
 
 df_details = pd.DataFrame(project_data)
 
-# Convert 'Domain' column to lowercase
+# Convert 'Domain' column to lowercase (already defined in your existing code)
 df_details['Domain'] = df_details['Domain'].str.lower()
 
 # Create the Dash app
@@ -50,7 +73,8 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     dcc.Tabs(id='tabs', value='tab-1', children=[
         dcc.Tab(label='Charts', value='tab-1'),
-        dcc.Tab(label='Project Details', value='tab-2'),
+        dcc.Tab(label='Electives', value='tab-3'),  # Added a new tab for Electives
+        dcc.Tab(label='Project Details', value='tab-2')
     ]),
     html.Div(id='tabs-content')
 ])
@@ -100,16 +124,62 @@ def render_content(tab):
             ),
             html.Div(id='output-table', style={'background-color': 'white', 'padding': '10px', 'border': '1px solid #ddd'})
         ])
+    elif tab == 'tab-3':  # Added tab for Electives
+        return html.Div([
+            html.H1("Electives Visualization"),
+            dcc.Graph(
+                id='electives-bar',
+                figure=px.bar(electives, x='Subject', y='students', title='Number of Students Enrolled in Each Subject')
+            ),
+            dcc.Graph(
+                id='electives-treemap',
+                figure=px.treemap(electives, path=['Parent2', 'Subject'], values='students',
+                                  hover_data=['Subject'], title='Technology Treemap Visualization')
+            ),
+            dcc.Graph(
+                id='electives-sunburst',
+                figure=px.sunburst(electives, path=['gParent', 'Subject'], values='students',
+                                   title='Hierarchical Structure of Subjects')
+            )
+            
+        ])
 
-# Define callback to update the table based on the selected domain
+# Define callback to update the table based on the selected domain (already defined in your existing code)
 @app.callback(
     Output('output-table', 'children'),
     [Input('domain-dropdown', 'value')]
 )
 def update_table(selected_domain):
     filtered_data = df_details[df_details['Domain'].str.contains(selected_domain)]
+
+    def format_recommended_subjects(subjects):
+        """Formats the 'Recommended Subjects' column into a human-readable string.
+
+        Args:
+            subjects (list): List of recommended subjects (e.g., ['PE: Business Analytics with Python']).
+
+        Returns:
+            str: Formatted string of recommended subjects (separated by commas and semicolons).
+        """
+
+        if not subjects:
+            return "-"  # Handle empty lists
+
+        formatted_subjects = [subject.strip() for subject in subjects]
+        oe_subjects = [subject for subject in formatted_subjects if subject.startswith('OE:')]
+        pe_subjects = [subject for subject in formatted_subjects if subject.startswith('PE:')]
+
+        oe_string = ', '.join(oe_subjects) if oe_subjects else ''
+        pe_string = ', '.join(pe_subjects) if pe_subjects else ''
+
+        return f"{oe_string}; {pe_string}"  # Combine OE and PE subjects with semicolons
+
+    # Apply the formatting function to the 'Recommended Subjects' column
+    filtered_data['Recommended Subjects'] = filtered_data['Recommended Subjects'][0]
+
     table = html.Table(
-        [
+        # ... rest of your table code (unchanged)
+        children=[
             html.Thead(
                 [
                     html.Tr(
@@ -132,12 +202,9 @@ def update_table(selected_domain):
                     ) for i in range(len(filtered_data))
                 ]
             )
-        ],
-        style={'border-collapse': 'collapse', 'width': '100%'}
+        ]
     )
     return table
-
-
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
