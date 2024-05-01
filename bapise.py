@@ -46,7 +46,7 @@ parent_technology = {
     'AIML': 'AI/ML',
     'NLP': 'AI/ML',
     'Deep Learning': 'AI/ML',
-    'Computer vision': 'Image Processing',
+    'Computer vision': 'AI/ML',
     'Image and video processing': 'Image Processing',
     'Blockchain': 'Blockchain',
     'Cybersecurity': 'Cybersecurity',
