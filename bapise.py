@@ -59,13 +59,72 @@ parent_technology = {
 
 df['Parent Technology'] = df['Domain'].map(parent_technology)
 
+
+
+
+
+
+
 # Sample data for project details (already defined in your existing code)
-project_data = pd.read_excel("./output.xlsx")
+project_data = pd.read_excel("./output (1).xlsx")
 
 df_details = pd.DataFrame(project_data)
 
 # Convert 'Domain' column to lowercase (already defined in your existing code)
 df_details['Domain'] = df_details['Domain'].str.lower()
+
+
+# last update-------------------------
+
+
+mini_csv = pd.read_csv("./cleaned_mini_project_data.csv")
+mini = mini_csv['Domain1'].value_counts().reset_index()
+mini.columns = ['Domain', 'Num_projects']
+mini_dict = dict(zip(mini['Domain'], mini['Num_projects']))
+df_dict = dict(zip(df['Domain'], df['num_projects']))
+
+
+
+parent_technology = {
+    'AIML': 'AI/ML',
+    'NLP': 'AI/ML',
+    'Deep Learning': 'AI/ML',
+    'Computer vision': 'Image Processing',
+    'Cybersecurity': 'Cybersecurity',
+    'Data Science/Analytics': 'Data Science/Analytics',
+    'UX': 'UX',
+    'DEV': 'DEV'
+}
+
+# Add a new column for parent technology
+mini['Parent Technology'] = mini['Domain'].map(parent_technology)
+
+
+
+
+# Combine the dictionaries
+combined_dict = {}
+all_domains = set(mini_dict.keys()) | set(df_dict.keys())
+for domain in all_domains:
+    combined_dict.setdefault('Domain', []).append(domain)
+    combined_dict.setdefault('Mini', []).append(mini_dict.get(domain, 0))
+    combined_dict.setdefault('Major', []).append(df_dict.get(domain, 0))
+
+# Calculate the 'Total' column
+combined_dict['Total'] = [mini + major for mini, major in zip(combined_dict['Mini'], combined_dict['Major'])]
+
+# Create the combined DataFrame
+combined = pd.DataFrame(combined_dict)
+
+
+
+
+#-------------------------
+
+
+
+
+
 
 # Create the Dash app
 app = dash.Dash(__name__)
@@ -73,7 +132,7 @@ app.config.suppress_callback_exceptions = True
 # Define the layout of the app
 app.layout = html.Div([
     dcc.Tabs(id='tabs', value='tab-1', children=[
-        dcc.Tab(label='Charts', value='tab-1'),
+        dcc.Tab(label='Projects', value='tab-1'),
         dcc.Tab(label='Electives', value='tab-3'),  # Added a new tab for Electives
         dcc.Tab(label='OE/PE Recommendations', value='tab-2'),
         dcc.Tab(label='Guide Recommendation', value='tab-4')
@@ -88,20 +147,40 @@ app.layout = html.Div([
 def render_content(tab):
     if tab == 'tab-1':
         return html.Div([
-            html.H1("Project Distribution by Domain"),
-            dcc.Graph(
-                id='bar-chart',
-                figure=px.bar(df, x='Domain', y='num_projects', title='Number of Projects per Domain')
-            ),
-            dcc.Graph(
-                id='pie-chart',
-                figure=px.pie(df, names='Domain', values='num_projects', title='Distribution of Projects by Domain')
-            ),
-            dcc.Graph(
-                id='treemap',
-                figure=px.treemap(df, path=['Parent Technology', 'Domain'], values='num_projects',
-                                  title='Hierarchical Distribution of Projects by Domain')
-            )
+        html.H1("Project Distribution by Domain"),
+        dcc.Graph(
+            id='bar-chart',
+            figure=px.bar(df, x='Domain', y='num_projects', title='Number of Projects per Domain')
+        ),
+        dcc.Graph(
+            id='pie-chart',
+            figure=px.pie(df, names='Domain', values='num_projects', title='Distribution of Projects by Domain')
+        ),
+        dcc.Graph(
+            id='treemap',
+            figure=px.treemap(df, path=['Parent Technology', 'Domain'], values='num_projects',
+                              title='Hierarchical Distribution of Projects by Domain')
+        ),
+        html.Hr(),  # Horizontal line
+        dcc.Graph(
+            id='scatter-plot',
+            figure=px.scatter(mini, x='Domain', y='Num_projects', title='Number of Projects vs. Domain',
+                            labels={'Num_projects': 'Number of Projects', 'Domain': 'Domain'})
+        ),
+        dcc.Graph(
+            id='treemap-2',
+            figure=px.treemap(mini, path=['Parent Technology', 'Domain'], values='Num_projects',
+                              title='Hierarchical Distribution of Projects by Domain',
+                              color='Num_projects', hover_data=['Num_projects'],
+                              color_continuous_scale='tealgrn')
+        ),
+        html.Hr(),  # Horizontal line
+        dcc.Graph(
+            id='bar-chart-2',
+            figure=px.bar(combined, x='Domain', y=['Mini', 'Major'],
+                          title='Number of Mini and Major Projects per Domain',
+                          labels={'value': 'Number of Projects', 'variable': 'Project Type'}, barmode='group')
+        ),
         ],
             id='tab-1-content'
         )
@@ -134,7 +213,7 @@ def render_content(tab):
         )
     elif tab == 'tab-3':  # Added tab for Electives
         return html.Div([
-            html.H1("OE/PE Recommendations"),
+            html.H1("OE and PE analysis"),
             dcc.Graph(
                 id='electives-bar',
                 figure=px.bar(electives, x='Subject', y='students', title='Number of Students Enrolled in Each Subject')
@@ -186,7 +265,7 @@ def update_table(selected_domain):
                         [
                             html.Th('Domain', style={'text-align': 'left'}),
                             html.Th('Project Title', style={'text-align': 'left'}),
-                            html.Th('Recommended PE', style={'text-align': 'left'})
+                            html.Th('Recommended PE and OE', style={'text-align': 'left'})
                         ]
                     )
                 ]
