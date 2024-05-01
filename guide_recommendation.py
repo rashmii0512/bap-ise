@@ -2,10 +2,9 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+df = pd.read_csv('all_project_data.csv')
 
-
-def recommend_guides(project_title):
-    df = pd.read_csv('all_project_data.csv')
+def recommend_guides(project_title, df=df):
 
     # Add the new project title to the DataFrame without using append
     new_df = df._append({'Project Title': project_title}, ignore_index=True)
