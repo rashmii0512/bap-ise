@@ -89,7 +89,7 @@ parent_technology = {
     'AIML': 'AI/ML',
     'NLP': 'AI/ML',
     'Deep Learning': 'AI/ML',
-    'Computer vision': 'Image Processing',
+    'Computer vision': 'AI/ML',
     'Cybersecurity': 'Cybersecurity',
     'Data Science/Analytics': 'Data Science/Analytics',
     'UX': 'UX',
